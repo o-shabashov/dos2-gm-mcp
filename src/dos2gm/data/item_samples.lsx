@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- GMExportItem samples (game version 3.6.9): quest item, weapon, weapon with ItemGeneration, armor. -->
+<samples>
+	<node id="GMExportItem" sample="quest">
+		<attribute id="TemplateID" type="22" value="053e23db-a144-4619-bb96-3208aecc77d5" />
+		<attribute id="Used" type="19" value="True" />
+		<attribute id="Version" type="4" value="906559488" />
+		<attribute id="UUID" type="22" value="" />
+		<attribute id="ID" type="22" value="053e23db-a144-4619-bb96-3208aecc77d5" />
+		<attribute id="Amount" type="4" value="1" />
+		<attribute id="ItemGroup" type="22" value="Unique" />
+		<attribute id="StatsID" type="22" value="LOOT_Ore_A_Iron_A" />
+		<attribute id="Identified" type="19" value="True" />
+		<attribute id="Level" type="4" value="1" />
+		<attribute id="IsChangedByGameMaster" type="19" value="False" />
+		<attribute id="CustomDisplayName" type="30" value="Humming Nugget" />
+		<attribute id="CustomDescription" type="30" value="Warm to the touch. Something hums quietly inside, like a swarm of bees.&#10;Quest item." />
+		<attribute id="CustomBookContent" type="30" value="" />
+		<attribute id="InventorySlot" type="3" value="65535" />
+		<attribute id="Floating" type="19" value="False" />
+		<attribute id="UseRemotely" type="19" value="False" />
+		<attribute id="Boost" type="25" value="" />
+		<attribute id="Parent" type="3" value="65535" />
+		<attribute id="Inventory" type="3" value="65535" />
+		<attribute id="IsGenerated" type="19" value="False" />
+		<attribute id="LevelGroupIndex" type="27" value="-1" />
+		<attribute id="RootGroupIndex" type="27" value="-1" />
+		<attribute id="NameGroupIndex" type="27" value="-1" />
+		<attribute id="NameIndex" type="27" value="-1" />
+		<attribute id="NameCool" type="27" value="-1" />
+		<attribute id="DamageTypeOverwrite" type="4" value="-1" />
+		<attribute id="GoldValueOverwrite" type="4" value="0" />
+		<attribute id="WeightValueOverwrite" type="4" value="-1" />
+		<attribute id="OriginalTemplate" type="22" value="053e23db-a144-4619-bb96-3208aecc77d5" />
+		<attribute id="EquipmentType" type="27" value="3" />
+		<attribute id="Key" type="22" value="" />
+		<attribute id="LockLevel" type="4" value="0" />
+		<attribute id="Active" type="19" value="False" />
+		<attribute id="HP" type="4" value="-1" />
+		<attribute id="CanBeUsed" type="19" value="False" />
+		<attribute id="IsPinnedContainer" type="19" value="False" />
+		<attribute id="CanBeMoved" type="19" value="False" />
+		<attribute id="CanBePickedUp" type="19" value="False" />
+		<attribute id="INVISIBLE" type="19" value="False" />
+		<attribute id="Durability" type="4" value="0" />
+		<attribute id="UnEquipLocked" type="19" value="False" />
+		<attribute id="Known" type="19" value="False" />
+		<attribute id="HasModifiedSkills" type="19" value="False" />
+		<attribute id="ModifiedBaseSkills" type="22" value="" />
+	</node>
+	<node id="GMExportItem" sample="weapon">
+		<attribute id="TemplateID" type="22" value="22a7e83e-5b7d-423d-9028-58f8af55603d" />
+		<attribute id="Used" type="19" value="True" />
+		<attribute id="Version" type="4" value="906559488" />
+		<attribute id="UUID" type="22" value="" />
+		<attribute id="ID" type="22" value="22a7e83e-5b7d-423d-9028-58f8af55603d" />
+		<attribute id="Amount" type="4" value="1" />
+		<attribute id="ItemGroup" type="22" value="Legendary" />
+		<attribute id="StatsID" type="22" value="WPN_Axe_2H" />
+		<attribute id="Identified" type="19" value="True" />
+		<attribute id="Level" type="4" value="5" />
+		<attribute id="IsChangedByGameMaster" type="19" value="False" />
+		<attribute id="CustomDisplayName" type="30" value="Butcher's Cleaver" />
+		<attribute id="CustomDescription" type="30" value="A heavy butcher's cleaver on a long shaft." />
+		<attribute id="CustomBookContent" type="30" value="" />
+		<attribute id="InventorySlot" type="3" value="65535" />
+		<attribute id="Floating" type="19" value="False" />
+		<attribute id="UseRemotely" type="19" value="False" />
+		<attribute id="Boost" type="25" value="" />
+		<attribute id="Parent" type="3" value="65535" />
+		<attribute id="Inventory" type="3" value="65535" />
+		<attribute id="IsGenerated" type="19" value="False" />
+		<attribute id="LevelGroupIndex" type="27" value="10" />
+		<attribute id="RootGroupIndex" type="27" value="0" />
+		<attribute id="NameGroupIndex" type="27" value="0" />
+		<attribute id="NameIndex" type="27" value="0" />
+		<attribute id="NameCool" type="27" value="0" />
+		<attribute id="DamageTypeOverwrite" type="4" value="-1" />
+		<attribute id="GoldValueOverwrite" type="4" value="0" />
+		<attribute id="WeightValueOverwrite" type="4" value="-1" />
+		<attribute id="OriginalTemplate" type="22" value="22a7e83e-5b7d-423d-9028-58f8af55603d" />
+		<attribute id="EquipmentType" type="27" value="0" />
+		<attribute id="Key" type="22" value="" />
+		<attribute id="LockLevel" type="4" value="1" />
+		<attribute id="Active" type="19" value="False" />
+		<attribute id="HP" type="4" value="-1" />
+		<attribute id="CanBeUsed" type="19" value="False" />
+		<attribute id="IsPinnedContainer" type="19" value="False" />
+		<attribute id="CanBeMoved" type="19" value="False" />
+		<attribute id="CanBePickedUp" type="19" value="False" />
+		<attribute id="INVISIBLE" type="19" value="False" />
+		<attribute id="Durability" type="4" value="0" />
+		<attribute id="UnEquipLocked" type="19" value="False" />
+		<attribute id="Known" type="19" value="False" />
+		<attribute id="HasModifiedSkills" type="19" value="False" />
+		<attribute id="ModifiedBaseSkills" type="22" value="" />
+		<children>
+			<node id="RuneStatsID">
+				<attribute id="RuneStatsID" type="22" value="" />
+			</node>
+			<node id="RuneStatsID">
+				<attribute id="RuneStatsID" type="22" value="" />
+			</node>
+			<node id="RuneStatsID">
+				<attribute id="RuneStatsID" type="22" value="" />
+			</node>
+		</children>
+	</node>
+	<node id="GMExportItem" sample="weapon_generated">
+		<attribute id="TemplateID" type="22" value="22a7e83e-5b7d-423d-9028-58f8af55603d" />
+		<attribute id="Used" type="19" value="True" />
+		<attribute id="Version" type="4" value="906559488" />
+		<attribute id="UUID" type="22" value="" />
+		<attribute id="ID" type="22" value="22a7e83e-5b7d-423d-9028-58f8af55603d" />
+		<attribute id="Amount" type="4" value="1" />
+		<attribute id="ItemGroup" type="22" value="Legendary" />
+		<attribute id="StatsID" type="22" value="WPN_Axe_2H" />
+		<attribute id="Identified" type="19" value="True" />
+		<attribute id="Level" type="4" value="5" />
+		<attribute id="IsChangedByGameMaster" type="19" value="True" />
+		<attribute id="CustomDisplayName" type="30" value="Butcher's Cleaver" />
+		<attribute id="CustomDescription" type="30" value="A heavy butcher's cleaver on a long shaft." />
+		<attribute id="CustomBookContent" type="30" value="" />
+		<attribute id="InventorySlot" type="3" value="65535" />
+		<attribute id="Floating" type="19" value="False" />
+		<attribute id="UseRemotely" type="19" value="False" />
+		<attribute id="Boost" type="25" value="" />
+		<attribute id="Parent" type="3" value="65535" />
+		<attribute id="Inventory" type="3" value="65535" />
+		<attribute id="IsGenerated" type="19" value="True" />
+		<attribute id="LevelGroupIndex" type="27" value="10" />
+		<attribute id="RootGroupIndex" type="27" value="0" />
+		<attribute id="NameGroupIndex" type="27" value="0" />
+		<attribute id="NameIndex" type="27" value="0" />
+		<attribute id="NameCool" type="27" value="0" />
+		<attribute id="DamageTypeOverwrite" type="4" value="-1" />
+		<attribute id="GoldValueOverwrite" type="4" value="0" />
+		<attribute id="WeightValueOverwrite" type="4" value="-1" />
+		<attribute id="OriginalTemplate" type="22" value="22a7e83e-5b7d-423d-9028-58f8af55603d" />
+		<attribute id="EquipmentType" type="27" value="0" />
+		<attribute id="Key" type="22" value="" />
+		<attribute id="LockLevel" type="4" value="1" />
+		<attribute id="Active" type="19" value="False" />
+		<attribute id="HP" type="4" value="-1" />
+		<attribute id="CanBeUsed" type="19" value="False" />
+		<attribute id="IsPinnedContainer" type="19" value="False" />
+		<attribute id="CanBeMoved" type="19" value="False" />
+		<attribute id="CanBePickedUp" type="19" value="False" />
+		<attribute id="INVISIBLE" type="19" value="False" />
+		<attribute id="Durability" type="4" value="0" />
+		<attribute id="UnEquipLocked" type="19" value="False" />
+		<attribute id="Known" type="19" value="False" />
+		<attribute id="HasModifiedSkills" type="19" value="False" />
+		<attribute id="ModifiedBaseSkills" type="22" value="" />
+		<children>
+			<node id="ItemGeneration">
+				<attribute id="Base" type="22" value="WPN_Axe_2H" />
+				<attribute id="ItemType" type="22" value="Legendary" />
+				<attribute id="Level" type="2" value="5" />
+				<attribute id="Random" type="4" value="0" />
+				<children>
+					<node id="Boost">
+						<attribute id="Object" type="22" value="Boost_Weapon_Cleave_Axe_Large_TwoHanded" />
+					</node>
+					<node id="Boost">
+						<attribute id="Object" type="22" value="Boost_Weapon_Primary_Strength_Axe_Legendary" />
+					</node>
+					<node id="Boost">
+						<attribute id="Object" type="22" value="Boost_Weapon_Status_Set_Bleeding_TwoHanded" />
+					</node>
+					<node id="Boost">
+						<attribute id="Object" type="22" value="Boost_Weapon_Damage_Bonus_Large" />
+					</node>
+					<node id="Boost">
+						<attribute id="Object" type="22" value="Boost_Weapon_EmptyRuneSlot" />
+					</node>
+				</children>
+			</node>
+			<node id="RuneStatsID">
+				<attribute id="RuneStatsID" type="22" value="" />
+			</node>
+			<node id="RuneStatsID">
+				<attribute id="RuneStatsID" type="22" value="" />
+			</node>
+			<node id="RuneStatsID">
+				<attribute id="RuneStatsID" type="22" value="" />
+			</node>
+		</children>
+	</node>
+	<node id="GMExportItem" sample="armor">
+		<attribute id="TemplateID" type="22" value="067a9f39-482e-49aa-b1b3-bc12f774b851" />
+		<attribute id="Used" type="19" value="True" />
+		<attribute id="Version" type="4" value="906559488" />
+		<attribute id="UUID" type="22" value="" />
+		<attribute id="ID" type="22" value="067a9f39-482e-49aa-b1b3-bc12f774b851" />
+		<attribute id="Amount" type="4" value="1" />
+		<attribute id="ItemGroup" type="22" value="Legendary" />
+		<attribute id="StatsID" type="22" value="ARM_Light_UpperBody" />
+		<attribute id="Identified" type="19" value="True" />
+		<attribute id="Level" type="4" value="5" />
+		<attribute id="IsChangedByGameMaster" type="19" value="False" />
+		<attribute id="CustomDisplayName" type="30" value="Butcher's Apron" />
+		<attribute id="CustomDescription" type="30" value="A leather apron, stiff with old blood." />
+		<attribute id="CustomBookContent" type="30" value="" />
+		<attribute id="InventorySlot" type="3" value="65535" />
+		<attribute id="Floating" type="19" value="False" />
+		<attribute id="UseRemotely" type="19" value="False" />
+		<attribute id="Boost" type="25" value="" />
+		<attribute id="Parent" type="3" value="65535" />
+		<attribute id="Inventory" type="3" value="65535" />
+		<attribute id="IsGenerated" type="19" value="False" />
+		<attribute id="LevelGroupIndex" type="27" value="-1" />
+		<attribute id="RootGroupIndex" type="27" value="-1" />
+		<attribute id="NameGroupIndex" type="27" value="-1" />
+		<attribute id="NameIndex" type="27" value="-1" />
+		<attribute id="NameCool" type="27" value="-1" />
+		<attribute id="DamageTypeOverwrite" type="4" value="-1" />
+		<attribute id="GoldValueOverwrite" type="4" value="0" />
+		<attribute id="WeightValueOverwrite" type="4" value="-1" />
+		<attribute id="OriginalTemplate" type="22" value="067a9f39-482e-49aa-b1b3-bc12f774b851" />
+		<attribute id="EquipmentType" type="27" value="1" />
+		<attribute id="Key" type="22" value="" />
+		<attribute id="LockLevel" type="4" value="1" />
+		<attribute id="Active" type="19" value="False" />
+		<attribute id="HP" type="4" value="-1" />
+		<attribute id="CanBeUsed" type="19" value="False" />
+		<attribute id="IsPinnedContainer" type="19" value="False" />
+		<attribute id="CanBeMoved" type="19" value="False" />
+		<attribute id="CanBePickedUp" type="19" value="False" />
+		<attribute id="INVISIBLE" type="19" value="False" />
+		<attribute id="Durability" type="4" value="0" />
+		<attribute id="UnEquipLocked" type="19" value="False" />
+		<attribute id="Known" type="19" value="False" />
+		<attribute id="HasModifiedSkills" type="19" value="False" />
+		<attribute id="ModifiedBaseSkills" type="22" value="" />
+		<children>
+			<node id="RuneStatsID">
+				<attribute id="RuneStatsID" type="22" value="" />
+			</node>
+			<node id="RuneStatsID">
+				<attribute id="RuneStatsID" type="22" value="" />
+			</node>
+			<node id="RuneStatsID">
+				<attribute id="RuneStatsID" type="22" value="" />
+			</node>
+		</children>
+	</node>
+</samples>

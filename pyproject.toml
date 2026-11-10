@@ -1,0 +1,27 @@
+[project]
+name = "dos2-gm-mcp"
+version = "0.1.0"
+description = "MCP server for Divinity: Original Sin 2 Game Master mode: read and edit campaign files, drive the running game through a Script Extender bridge"
+readme = "README.md"
+license = "MIT"
+authors = [{name = "Oleg Shabashov"}]
+keywords = ["mcp", "divinity-original-sin-2", "game-master", "modding", "lslib"]
+requires-python = ">=3.11"
+dependencies = ["mcp>=2.3,<3", "pillow>=10"]
+
+[project.scripts]
+dos2-gm-mcp = "dos2gm.server:main"
+dos2-gm-fetch-lslib = "dos2gm.fetch_lslib:main"
+
+[project.urls]
+Repository = "https://github.com/o-shabashov/dos2-gm-mcp"
+
+[dependency-groups]
+dev = ["lupa>=2.8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dos2gm"]

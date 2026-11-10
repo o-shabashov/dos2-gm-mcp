@@ -1,0 +1,7 @@
+{
+    "RequiredExtensionVersion": 56,
+    "ModTable": "DOS2GMBridge",
+    "FeatureFlags": [
+        "Lua"
+    ]
+}

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<save>
+    <header version="2" />
+    <version major="3" minor="6" revision="6" build="0" />
+    <region id="Config">
+        <node id="root">
+            <children>
+                <node id="Dependencies" />
+                <node id="ModuleInfo">
+                    <attribute id="Author" value="dos2-gm-mcp" type="30" />
+                    <attribute id="CharacterCreationLevelName" value="" type="22" />
+                    <attribute id="Description" value="Bridge for the dos2-gm MCP server: commands for the running game through Script Extender." type="30" />
+                    <attribute id="DescriptionName" value="Bridge for the dos2-gm MCP server: commands for the running game through Script Extender." handle="h4f0c2a17g62beg460eg8c08g9ff16c89dac6" type="28" />
+                    <attribute id="DisplayName" value="DOS2 GM MCP Bridge" handle="h7a3e9b20g62beg460eg8c08g9ff16c89dac6" type="28" />
+                    <attribute id="Folder" value="DOS2GMBridge_b3c8bdc5-62be-560e-8c08-9ff16c89dac6" type="30" />
+                    <attribute id="GMTemplate" value="" type="22" />
+                    <attribute id="LobbyLevelName" value="" type="22" />
+                    <attribute id="MD5" value="" type="23" />
+                    <attribute id="MenuLevelName" value="" type="22" />
+                    <attribute id="Name" value="DOS2 GM MCP Bridge" type="22" />
+                    <attribute id="NumPlayers" value="4" type="1" />
+                    <attribute id="PhotoBooth" value="" type="22" />
+                    <attribute id="StartupLevelName" value="" type="22" />
+                    <attribute id="Tags" value="" type="30" />
+                    <attribute id="Type" value="Add-on" type="22" />
+                    <attribute id="UUID" value="b3c8bdc5-62be-560e-8c08-9ff16c89dac6" type="22" />
+                    <attribute id="Version" value="268435456" type="4" />
+                    <children>
+                        <!-- PublishVersion is the editor version at publish time. With 1.0.0.0 the game treats the mod as made for
+                             Classic Edition and refuses to enable it; 909321303 (3.6.51.x) is a known good value. -->
+                        <node id="PublishVersion">
+                            <attribute id="Version" value="909321303" type="4" />
+                        </node>
+                        <node id="Scripts" />
+                        <node id="TargetModes">
+                            <children>
+                                <node id="Target">
+                                    <attribute id="Object" value="Story" type="22" />
+                                </node>
+                                <node id="Target">
+                                    <attribute id="Object" value="GM" type="22" />
+                                </node>
+                            </children>
+                        </node>
+                    </children>
+                </node>
+            </children>
+        </node>
+    </region>
+</save>

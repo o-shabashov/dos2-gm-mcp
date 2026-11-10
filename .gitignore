@@ -1,0 +1,8 @@
+.venv/
+.cache/
+backups/
+lslib/
+__pycache__/
+config.json
+*.pak
+read.json
