@@ -1,0 +1,37 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync
+      - run: uv run python tests/bridge_test.py
+      - run: uv run python tests/mcp_probe.py
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Docker image answers MCP introspection
+        run: |
+          docker build -t dos2-gm-mcp .
+          uv run --no-project python tests/mcp_probe.py docker run -i --rm dos2-gm-mcp
+      - name: MCPB manifest is valid and packs
+        run: |
+          npx -y @anthropic-ai/mcpb validate manifest.json
+          npx -y @anthropic-ai/mcpb pack . dos2-gm-mcp.mcpb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dos2-gm-mcp.mcpb
+          path: dos2-gm-mcp.mcpb

@@ -11,39 +11,50 @@ import sys
 import urllib.request
 import zipfile
 
-from .paths import PROJECT
+from .paths import HOME
 
 VERSION = "v1.20.4"
 URL = f"https://github.com/Norbyte/lslib/releases/download/{VERSION}/ExportTool-{VERSION}.zip"
 SHA256 = "5e02368fb8acafda9b45acba37a3f3bf507fc3d65a083a159abbeab06337190e"
-TARGET = PROJECT / "lslib"
+TARGET = HOME / "lslib"
 DIVINE = TARGET / "Packed" / "Tools" / "Divine.exe"
 
 
-def main() -> int:
-    force = "--force" in sys.argv[1:]
+class FetchError(Exception):
+    pass
+
+
+def fetch(force: bool = False) -> str:
+    """Downloads and unpacks LSLib; returns a one-line result. Raises FetchError when something is off."""
     if DIVINE.is_file() and not force:
-        print(f"LSLib is already here: {DIVINE}\nUse --force to download it again.")
-        return 0
-    print(f"Downloading LSLib {VERSION} from {URL}")
+        return f"LSLib is already here: {DIVINE}"
     with urllib.request.urlopen(URL, timeout=120) as resp:
         blob = resp.read()
     digest = hashlib.sha256(blob).hexdigest()
     if digest != SHA256:
-        print(f"Checksum mismatch: expected {SHA256}, got {digest}. Nothing was unpacked.", file=sys.stderr)
-        return 1
+        raise FetchError(f"Checksum mismatch: expected {SHA256}, got {digest}. Nothing was unpacked.")
     root = TARGET.resolve()
     with zipfile.ZipFile(io.BytesIO(blob)) as z:
         for info in z.infolist():
             dest = (root / info.filename).resolve()
             if root != dest and root not in dest.parents:
-                print(f"Refusing to unpack outside {root}: {info.filename}", file=sys.stderr)
-                return 1
+                raise FetchError(f"Refusing to unpack outside {root}: {info.filename}")
+        root.mkdir(parents=True, exist_ok=True)
         z.extractall(root)
     if not DIVINE.is_file():
-        print(f"Unpacked, but {DIVINE} is missing.", file=sys.stderr)
+        raise FetchError(f"Unpacked, but {DIVINE} is missing.")
+    return f"LSLib {VERSION} is ready: {DIVINE}"
+
+
+def main() -> int:
+    force = "--force" in sys.argv[1:]
+    print(f"LSLib {VERSION} from {URL}")
+    try:
+        print(fetch(force))
+    except (FetchError, OSError) as e:
+        print(e, file=sys.stderr)
         return 1
-    print(f"Done: {DIVINE}\nDivine needs the .NET 8 runtime or newer (the server sets DOTNET_ROLL_FORWARD=Major).")
+    print("Divine needs the .NET 8 runtime or newer (the server sets DOTNET_ROLL_FORWARD=Major).")
     return 0
 
 

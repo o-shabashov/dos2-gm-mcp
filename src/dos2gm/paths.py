@@ -6,6 +6,8 @@ Lookup order: environment variable → config.json in the project root → defau
   DOS2GM_BACKUPS    the backups folder
   DOS2GM_GAME       the game folder (by default it is looked up in the Steam libraries)
   DOS2GM_OSIRIS_DATA, DOS2GM_MODS  the "Osiris Data" and "Mods" folders in the game's documents folder
+  DOS2GM_HOME       where LSLib, backups, the cache and config.json live (by default the project root);
+                    bundles set it to a folder that survives updates
 """
 import ctypes
 import json
@@ -15,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PROJECT = Path(__file__).resolve().parents[2]
+HOME = Path(os.environ.get("DOS2GM_HOME") or PROJECT).expanduser()
 GAME_DOCS = Path("Larian Studios") / "Divinity Original Sin 2 Definitive Edition"
 
 
@@ -62,7 +65,7 @@ def steam_game_dir() -> Path | None:
 
 def load() -> Paths:
     cfg = {}
-    cfg_file = PROJECT / "config.json"
+    cfg_file = HOME / "config.json"
     if cfg_file.exists():
         cfg = json.loads(cfg_file.read_text("utf-8"))
 
@@ -73,9 +76,9 @@ def load() -> Paths:
     game = os.environ.get("DOS2GM_GAME") or cfg.get("game")
     return Paths(
         campaigns=pick("DOS2GM_CAMPAIGNS", "campaigns", docs / "GMCampaigns"),
-        divine=pick("DOS2GM_DIVINE", "divine", PROJECT / "lslib" / "Packed" / "Tools" / "Divine.exe"),
-        backups=pick("DOS2GM_BACKUPS", "backups", PROJECT / "backups"),
-        cache=PROJECT / ".cache",
+        divine=pick("DOS2GM_DIVINE", "divine", HOME / "lslib" / "Packed" / "Tools" / "Divine.exe"),
+        backups=pick("DOS2GM_BACKUPS", "backups", HOME / "backups"),
+        cache=HOME / ".cache",
         osiris_data=pick("DOS2GM_OSIRIS_DATA", "osiris_data", docs / "Osiris Data"),
         mods=pick("DOS2GM_MODS", "mods", docs / "Mods"),
         game=Path(game) if game else steam_game_dir(),

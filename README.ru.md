@@ -36,12 +36,16 @@ claude mcp add dos2-gm --scope user -- uv --directory C:\path\to\dos2-gm-mcp run
 
 Папки игры и документов находятся сами. Свои пути задаются переменными окружения `DOS2GM_CAMPAIGNS`, `DOS2GM_GAME`,
 `DOS2GM_DIVINE`, `DOS2GM_BACKUPS`, `DOS2GM_MODS`, `DOS2GM_OSIRIS_DATA` или файлом `config.json` в корне проекта.
+`DOS2GM_HOME` задаёт папку, где лежат LSLib, бэкапы, кэш и `config.json` (по умолчанию корень проекта).
+
+Для Claude Desktop есть бандл одним файлом: скачайте `dos2-gm-mcp.mcpb` из [последнего выпуска](https://github.com/o-shabashov/dos2-gm-mcp/releases/latest), откройте его и попросите ассистента один раз вызвать `dos2_fetch_lslib`. Бандл держит LSLib и бэкапы в `~/.dos2-gm-mcp`.
 
 ## Инструменты
 
 | Чтение | Что даёт |
 | --- | --- |
 | `dos2_status` | пути, запущена ли игра, список кампаний |
+| `dos2_fetch_lslib` | разовая настройка: скачивает LSLib и сверяет SHA-256 (то же, что `uv run dos2-gm-fetch-lslib`) |
 | `dos2_campaign` | метаданные и дополнения, сцены, карты с отметками, виньетки, шаблоны, стикеры, журнал |
 | `dos2_scene` | персонажи сцены (имя, шаблон, позиция, здоровье, опыт, отношение, встреча), встречи, стикеры |
 | `dos2_templates`, `dos2_template` | шаблоны NPC и предметов из `Eggs.lsf`, один шаблон целиком |

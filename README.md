@@ -1,5 +1,7 @@
 # dos2-gm-mcp
 
+[![CI](https://github.com/o-shabashov/dos2-gm-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/o-shabashov/dos2-gm-mcp/actions/workflows/ci.yml)
+
 **English** · [Русский](README.ru.md)
 
 An MCP server that lets an AI assistant prepare and run **Game Master mode campaigns in Divinity: Original Sin 2 – Definitive Edition**.
@@ -62,6 +64,8 @@ Or to any other MCP client:
 }
 ```
 
+For Claude Desktop there is also a one-file bundle: download `dos2-gm-mcp.mcpb` from the [latest release](https://github.com/o-shabashov/dos2-gm-mcp/releases/latest), open it, then ask the assistant to call `dos2_fetch_lslib` once. The bundle keeps LSLib and backups in `~/.dos2-gm-mcp`.
+
 The game folder and `Documents\Larian Studios\Divinity Original Sin 2 Definitive Edition` are found automatically (Steam libraries, relocated Documents folders). Override with environment variables or a `config.json` in the project root:
 
 | Variable | Meaning |
@@ -71,6 +75,7 @@ The game folder and `Documents\Larian Studios\Divinity Original Sin 2 Definitive
 | `DOS2GM_DIVINE` | path to `Divine.exe` |
 | `DOS2GM_BACKUPS` | where backups go (default `./backups`) |
 | `DOS2GM_MODS`, `DOS2GM_OSIRIS_DATA` | the `Mods` and `Osiris Data` folders in the game's documents |
+| `DOS2GM_HOME` | where LSLib, backups, the cache and `config.json` live (default: the project root) |
 
 ## Tools
 
@@ -79,6 +84,7 @@ The `campaign` argument accepts a campaign name, its folder name, its UUID, or a
 | Read | Returns |
 | --- | --- |
 | `dos2_status` | paths, whether the game is running, the list of campaigns |
+| `dos2_fetch_lslib` | one-time setup: downloads LSLib and checks its SHA-256 (same as `uv run dos2-gm-fetch-lslib`) |
 | `dos2_campaign` | metadata and add-ons, scenes, maps with pins, vignettes, templates, stickies, journal |
 | `dos2_scene` | characters in a scene (name, template, position, health, alignment, encounter), encounters, stickies |
 | `dos2_templates`, `dos2_template` | NPC and item templates, or one template in full |
@@ -143,6 +149,7 @@ Notes for people building their own tools; all verified in the game.
 
 ```
 uv run python tests/bridge_test.py                    # the real bridge Lua in Lua 5.3 against stubs
+uv run python tests/mcp_probe.py                      # MCP handshake, tool list and one call over stdio
 uv run python tests/check_mapping.py                  # scenes of all campaigns, read-only
 uv run python tests/smoke_read.py "My Campaign"       # read-only
 uv run python tests/write_test.py <temp folder>       # writes into copies of campaigns

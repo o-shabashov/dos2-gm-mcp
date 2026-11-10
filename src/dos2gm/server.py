@@ -47,11 +47,24 @@ def dos2_status() -> dict:
     p = g.paths
     out = {"campaigns_dir": str(p.campaigns), "divine": str(p.divine), "divine_found": p.divine.exists(),
            "backups_dir": str(p.backups), "game_running": game_running()}
+    if not out["divine_found"]:
+        out["hint"] = "Divine.exe (LSLib) is missing: call dos2_fetch_lslib once, or set DOS2GM_DIVINE."
     try:
         out["campaigns"] = g.campaigns()
     except GMError as e:
         out["error"] = str(e)
     return out
+
+
+@mcp.tool()
+def dos2_fetch_lslib(force: bool = False) -> dict:
+    """One-time setup: downloads the official LSLib release by Norbyte (Divine.exe, MIT license) from GitHub,
+    checks its pinned SHA-256 and unpacks it into the data folder. Needed before campaign files can be read."""
+    from . import fetch_lslib
+    try:
+        return {"result": fetch_lslib.fetch(force), "source": fetch_lslib.URL}
+    except (fetch_lslib.FetchError, OSError) as e:
+        return {"error": str(e)}
 
 
 @mcp.tool()

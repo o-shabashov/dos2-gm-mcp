@@ -1,0 +1,9 @@
+.git
+.venv
+.cache
+backups
+lslib
+docs
+*.pak
+*.mcpb
+config.json
