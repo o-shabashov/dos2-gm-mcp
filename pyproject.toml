@@ -1,6 +1,6 @@
 [project]
 name = "dos2-gm-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "MCP server for Divinity: Original Sin 2 Game Master mode: read and edit campaign files, drive the running game through a Script Extender bridge"
 readme = "README.md"
 license = "MIT"

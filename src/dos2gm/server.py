@@ -2,8 +2,11 @@
 import json
 import re
 from pathlib import Path
+from typing import Annotated
 
 from mcp.server.mcpserver import MCPServer
+from mcp.types import ToolAnnotations
+from pydantic import Field
 
 from . import lsx, paths
 from .gm import GM, GMError, game_running, stable_uuid
@@ -30,6 +33,26 @@ it shows what is missing.
 mcp = MCPServer("dos2-gm", instructions=INSTRUCTIONS)
 _gm: GM | None = None
 
+CAMPAIGN = ("The campaign to work on: its name, its folder name, its UUID, or a unique part of any of them. "
+            "dos2_status lists the campaigns.")
+ALLOW_RUNNING = ("Keep false. Set true only after the user has confirmed that the running game sits in the main "
+                 "menu: a write into a campaign that is loaded in the game gets lost or damages it.")
+
+
+def tool(title: str, /, *, read_only: bool = False, destructive: bool = False, idempotent: bool = False,
+         open_world: bool = False, **params: str):
+    """Registers an MCP tool with a title, behaviour annotations and a description for each parameter."""
+    def decorator(fn):
+        unknown = set(params) - set(fn.__annotations__)
+        if unknown:
+            raise TypeError(f"{fn.__name__}: no such parameters {sorted(unknown)}")
+        for p, text in params.items():
+            fn.__annotations__[p] = Annotated[fn.__annotations__[p], Field(description=text)]
+        notes = ToolAnnotations(title=title, read_only_hint=read_only, destructive_hint=destructive,
+                                idempotent_hint=idempotent or read_only, open_world_hint=open_world)
+        return mcp.tool(title=title, annotations=notes)(fn)
+    return decorator
+
 
 def gm() -> GM:
     global _gm
@@ -40,9 +63,16 @@ def gm() -> GM:
 
 # --- overview -----------------------------------------------------------------------
 
-@mcp.tool()
+@tool("Server status and campaign list", read_only=True)
 def dos2_status() -> dict:
-    """Paths (campaigns, Divine.exe, backups), whether the game is running, and the list of GM campaigns."""
+    """Reports the server's setup and lists the GM campaigns. Returns the campaigns folder, the path to Divine.exe and
+    whether it exists, the backups folder, whether the game process is running, and for every campaign its name,
+    folder, UUID, add-ons, scene count and last-modified time.
+
+    Read-only, no parameters. Call it first in a session to choose a campaign and check setup: if divine_found is
+    false, run dos2_fetch_lslib before any other tool. For the readiness of the running game (Script Extender,
+    bridge mod) use dos2_live_status instead.
+    """
     g = gm()
     p = g.paths
     out = {"campaigns_dir": str(p.campaigns), "divine": str(p.divine), "divine_found": p.divine.exists(),
@@ -56,10 +86,17 @@ def dos2_status() -> dict:
     return out
 
 
-@mcp.tool()
+@tool("Download LSLib (one-time setup)", idempotent=True, open_world=True,
+      force="Download and unpack again even when Divine.exe is already present. Default false.")
 def dos2_fetch_lslib(force: bool = False) -> dict:
-    """One-time setup: downloads the official LSLib release by Norbyte (Divine.exe, MIT license) from GitHub,
-    checks its pinned SHA-256 and unpacks it into the data folder. Needed before campaign files can be read."""
+    """One-time setup: downloads the official LSLib release by Norbyte (Divine.exe, MIT license) from GitHub, verifies
+    its pinned SHA-256 and unpacks it into the server's data folder. Every tool that reads or writes campaign files
+    needs Divine.exe, so run this when dos2_status reports divine_found=false.
+
+    Needs internet access. Writes only into the data folder; the game and the campaigns are not touched. When
+    Divine.exe is already there it returns at once without downloading. Returns {result, source}, or {error} on a
+    network failure or checksum mismatch (then nothing is unpacked).
+    """
     from . import fetch_lslib
     try:
         return {"result": fetch_lslib.fetch(force), "source": fetch_lslib.URL}
@@ -67,9 +104,17 @@ def dos2_fetch_lslib(force: bool = False) -> dict:
         return {"error": str(e)}
 
 
-@mcp.tool()
+@tool("Campaign overview", read_only=True,
+      campaign=CAMPAIGN)
 def dos2_campaign(campaign: str) -> dict:
-    """Campaign summary: metadata and add-ons, scenes, maps with pins, vignettes, templates, sticky notes, journal."""
+    """Reads one campaign and returns a compact overview: metadata and attached add-on mods, scenes, Overview maps with
+    their pins, vignettes (uuid, title, answers), NPC and item templates (kind, name, level), sticky notes (title,
+    kind, folder) and the whole journal.
+
+    Read-only. Use it to orient yourself before reading details or editing. For full content follow up with
+    dos2_scene (who stands in a scene), dos2_template (one template), dos2_vignettes or dos2_notes. To pick a
+    campaign in the first place use dos2_status.
+    """
     g = gm()
     d = g.resolve(campaign)
     _, top = g.eggs(d)
@@ -85,11 +130,21 @@ def dos2_campaign(campaign: str) -> dict:
     }
 
 
-@mcp.tool()
+@tool("Edit campaign name, description, author", destructive=True, idempotent=True,
+      campaign=CAMPAIGN,
+      name="New campaign name as shown in the game's campaign list. Omit to keep the current one.",
+      description="New campaign description. Omit to keep the current one.",
+      author="New author name. Omit to keep the current one.",
+      allow_running=ALLOW_RUNNING)
 def dos2_campaign_meta(campaign: str, name: str | None = None, description: str | None = None,
                        author: str | None = None, allow_running: bool = False) -> dict:
-    """Changes the campaign name, description and author in meta.lsf (same as editing campaign metadata in the game).
-    The campaign folder keeps its name: the game identifies the campaign by it."""
+    """Changes the campaign's name, description and author in meta.lsf, the same fields the game edits in its campaign
+    settings. Only the fields you pass are changed. With none of them given nothing is written and the current
+    metadata is returned.
+
+    The campaign folder keeps its name, because the game identifies the campaign by it. The previous file is backed up first; undo with dos2_restore.
+    Fails with an error while the game process is running unless allow_running=true. Returns the backup id and the resulting metadata.
+    """
     g = gm()
     d = g.resolve(campaign)
     if name is None and description is None and author is None:
@@ -105,27 +160,52 @@ def dos2_campaign_meta(campaign: str, name: str | None = None, description: str 
     return {**w.commit(), "meta": g.meta(d)}
 
 
-@mcp.tool()
+@tool("Read a scene's contents", read_only=True,
+      campaign=CAMPAIGN,
+      scene="Scene name or scene ID, as listed by dos2_campaign.",
+      limit="Maximum number of characters to list (default 200).")
 def dos2_scene(campaign: str, scene: str, limit: int = 200) -> dict:
-    """Scene contents from LevelCache: characters (name, root template, position, vitality, experience, alignment,
-    encounter), encounters with their members, item count, the scene's sticky notes. scene is a scene name or ID."""
+    """Reads what the Game Master has placed in one scene, from the campaign files (LevelCache): characters with name,
+    root template, position, vitality, experience, alignment and encounter; encounters with their members; the item
+    count; the scene's sticky notes.
+
+    Read-only, and it shows the saved state, not a running game: for the live level use dos2_live_characters. Placed
+    characters cannot be edited through files; change them in the game or with the dos2_live_* tools. Fails with an
+    error if the scene has never been loaded in the game (it has no LevelCache file yet).
+    """
     g = gm()
     d = g.resolve(campaign)
     return g.scene_detail(d, g.resolve_scene(d, scene), limit)
 
 
-@mcp.tool()
+@tool("List saved templates", read_only=True,
+      campaign=CAMPAIGN,
+      kind="Filter by kind: \"npc\" or \"item\". Omit to list both.")
 def dos2_templates(campaign: str, kind: str | None = None) -> list[dict]:
-    """Campaign templates from Eggs.lsf: kind = "npc", "item", or empty for all."""
+    """Lists the campaign's saved Game Master templates (the "Creatures and Items" panel, stored in Eggs.lsf) as short
+    summaries. NPC entries have name, stat_name, template_id, level, alignment, skills and item stats ids; item
+    entries have name, stats_id, template_id and level.
+
+    Read-only. Use dos2_template to get one template in full, and dos2_find_templates to search by substring across
+    all campaigns, including Larian's sample ones.
+    """
     g = gm()
     _, top = g.eggs(g.resolve(campaign))
     out = [g.template_summary(t) for t in lsx.kids(top)]
     return [s for s in out if not kind or s["kind"] == kind]
 
 
-@mcp.tool()
+@tool("Get one template in full", read_only=True,
+      campaign=CAMPAIGN,
+      name="Exact template name (case-insensitive), as listed by dos2_templates.")
 def dos2_template(campaign: str, name: str) -> dict:
-    """A full template: base stats, GM edits, abilities, talents, skills, skill bar, items."""
+    """Returns one saved Game Master template of the campaign in full: for an NPC its base stats, the GM's stat edits,
+    abilities, talents, skills, skill bar and items with slots; for an item all of its attributes.
+
+    Read-only. Fails with an error when the campaign has no template with that name. Use it to inspect a template
+    before changing it with dos2_put_npc_template or dos2_put_item_template. To list the available names use
+    dos2_templates; to search across campaigns use dos2_find_templates.
+    """
     g = gm()
     t = g.find_template(g.resolve(campaign), name)
     if t is None:
@@ -133,33 +213,66 @@ def dos2_template(campaign: str, name: str) -> dict:
     return g.template_detail(t)
 
 
-@mcp.tool()
+@tool("Search templates across campaigns", read_only=True,
+      query="Case-insensitive substring matched against the template name, StatName, root template, skills and "
+            "items. Empty matches everything.",
+      campaign="Search only this campaign (name, folder, UUID or a part). Omit to search all campaigns.",
+      kind="Filter by kind: \"npc\" or \"item\". Omit for both.",
+      limit="Maximum number of hits to return (default 30).")
 def dos2_find_templates(query: str = "", campaign: str | None = None, kind: str | None = None,
                         limit: int = 30) -> list[dict]:
-    """Searches templates in all campaigns (or in one) by a substring of the name, StatName, root template,
-    skills and items. A hit can be used as base for dos2_put_npc_template in the form "Campaign:Name"."""
+    """Searches saved Game Master templates in every campaign on disk (or in one) and returns matching summaries with
+    the campaign each one lives in. Larian's sample campaigns are included, so this works as a library of ready
+    NPCs.
+
+    Read-only. Use it to find a template to copy: pass a hit to dos2_put_npc_template as base="Campaign:Name". To
+    list one campaign's templates without searching use dos2_templates.
+    """
     return gm().search_templates(query, campaign, kind, limit)
 
 
-@mcp.tool()
+@tool("List vignettes in full", read_only=True,
+      campaign=CAMPAIGN)
 def dos2_vignettes(campaign: str) -> list[dict]:
-    """The campaign's vignettes in full: title, text, question, answers, image."""
+    """Returns every vignette of the campaign with its full content: uuid, title, text, question, answer options, image
+    and folder. Vignettes are the illustrated story cards the Game Master shows to players, optionally with a vote.
+
+    Read-only. When titles are enough, dos2_campaign is cheaper. Create or change a vignette with dos2_put_vignette
+    and remove one with dos2_delete_vignette.
+    """
     g = gm()
     return g.vignettes(g.resolve(campaign))
 
 
-@mcp.tool()
+@tool("List GM sticky notes", read_only=True,
+      campaign=CAMPAIGN)
 def dos2_notes(campaign: str) -> list[dict]:
-    """GM sticky notes: on an Overview map (kind=map) and in scenes, bound to an object (kind=scene)."""
+    """Returns all Game Master sticky notes of the campaign with their full text. Each note has uuid, title, text,
+    folder and kind: a "map" note sits on an Overview map (map UUID, x and y in map pixels), a "scene" note is bound
+    to an object inside a scene (scene ID and the bound object). Players never see these notes.
+
+    Read-only. When titles are enough, dos2_campaign is cheaper. Create or change a note with dos2_put_note and
+    remove one with dos2_delete_note.
+    """
     g = gm()
     return g.notes(g.resolve(campaign))
 
 
-@mcp.tool()
+@tool("Read a campaign file as LSX", read_only=True,
+      campaign=CAMPAIGN,
+      file="Path of the file inside the campaign folder, e.g. \"Eggs.lsf\", \"meta.lsf\" or \"LevelCache/<scene "
+           "ID>.lsf\".",
+      xpath="ElementTree XPath to return only matching nodes, e.g. \".//node[@id='Note']\". Omit to get the whole "
+            "file.",
+      max_chars="Cut the output to this many characters (default 20000).")
 def dos2_raw(campaign: str, file: str, xpath: str | None = None, max_chars: int = 20000) -> str:
-    """A campaign file as LSX text, for exploring the formats. file is a path inside the campaign, e.g.
-    "Eggs.lsf" or "LevelCache/<scene ID>.lsf". xpath is an ElementTree expression, e.g.
-    ".//node[@id='Note']"; without it the whole file is returned. The output is cut to max_chars."""
+    """Converts any binary campaign file (.lsf) to LSX text and returns it, whole or filtered by XPath. This is the
+    escape hatch for exploring data the other tools do not expose.
+
+    Read-only. Prefer the structured tools (dos2_campaign, dos2_scene, dos2_template, dos2_vignettes, dos2_notes)
+    when they cover the need: raw files are large. With xpath the output starts with a match count; output longer
+    than max_chars is truncated with a note. Fails with an error if the file does not exist in the campaign.
+    """
     g = gm()
     d = g.resolve(campaign)
     target = (d / file).resolve()
@@ -173,7 +286,32 @@ def dos2_raw(campaign: str, file: str, xpath: str | None = None, max_chars: int 
 
 # --- NPC templates ---------------------------------------------------------------------
 
-@mcp.tool()
+@tool("Create or update an NPC template", destructive=True, idempotent=True,
+      campaign=CAMPAIGN,
+      name="Template name. An existing template with this name in the campaign is updated or replaced.",
+      base="Template to copy from: \"Campaign:Name\", or just a name that is unique across all campaigns (find one "
+           "with dos2_find_templates). Omit to change the existing template called name in place.",
+      template_id="Root template GUID: the model, race and gender. Omit to keep the base's.",
+      stat_name="Stats entry that gives the base stats, e.g. GEN_HumanCitizen. Omit to keep the base's.",
+      level="NPC level. Omit to keep the base's.",
+      alignment="Attitude towards the party: \"Neutral NPC\", \"Evil NPC\" (hostile) or \"Good NPC\" (ally).",
+      archetype="AI archetype name that drives combat behaviour, copied verbatim into the template. Omit to keep.",
+      trader="Whether the NPC offers trade. Omit to keep.",
+      display_name="Name shown above the character's head, when it should differ from the template name.",
+      bonus="GM additions to the base stats, e.g. {\"Constitution\": 4, \"Strength\": 2}. A value of 0 removes that "
+            "edit.",
+      ability_bonus="GM additions to abilities, e.g. {\"TwoHanded\": 3, \"WarriorLore\": 2}. 0 removes the edit.",
+      skills="The complete skill list, e.g. [\"Target_SingleHandedAttack\", \"Shout_EnemyTaunt\"]. Replaces the skills "
+             "and fills the skill bar in this order.",
+      items="The complete item list; replaces the items. Each entry: {\"stats_id\", \"template_id\", \"amount\", \"slot\", "
+            "\"level\", \"name\"}. slot is a number or one of weapon, shield, helmet, breast, leggings, boots, gloves, "
+            "belt, amulet, ring, ring2; backpack when omitted.",
+      items_from="\"Campaign:Name\" of a template whose items are copied as they are, including generated stats.",
+      reset_bonus="First drop every GM edit inherited from the base (stats, abilities, talents), then apply yours. "
+                  "Default false.",
+      talents="Talents to add, by their Script Extender names, e.g. [\"Executioner\", \"Leech\"].",
+      remove_talents="Talents to remove, by the same names.",
+      allow_running=ALLOW_RUNNING)
 def dos2_put_npc_template(
     campaign: str,
     name: str,
@@ -195,24 +333,14 @@ def dos2_put_npc_template(
     remove_talents: list[str] | None = None,
     allow_running: bool = False,
 ) -> dict:
-    """Creates or changes an NPC template (the GM's saved templates in the "Creatures and Items" panel).
+    """Creates a saved NPC template in the campaign (the Game Master's "Creatures and Items" panel), or changes the one
+    that already has this name. The usual way is to copy a ready NPC with base and adjust it: name, level,
+    alignment, GM stat edits, skills, items. Parameters you omit keep the base's values.
 
-    name: template name; a template with this name in the campaign is replaced.
-    base: the template to copy from, "Campaign:Name" or just a name (then it is looked up in all campaigns).
-      Without base, the existing template with this name is changed.
-    template_id: root template (model, race, gender). stat_name: stats entry, e.g. GEN_HumanCitizen.
-    level: NPC level. alignment: "Neutral NPC", "Evil NPC" or "Good NPC". trader: whether the NPC is a trader.
-    display_name: the name shown above the head, overriding name.
-    bonus: GM additions to the base stats, e.g. {"Constitution": 4, "Strength": 2}; 0 removes the edit.
-    ability_bonus: the same for abilities, e.g. {"TwoHanded": 3, "WarriorLore": 2}.
-    skills: the complete skill list, e.g. ["Target_SingleHandedAttack", "Shout_EnemyTaunt"]; sets the skills and
-      fills the skill bar in that order.
-    items: the complete item list: {"stats_id", "template_id", "amount", "slot", "level", "name"}; slot is a
-      number or weapon/shield/helmet/breast/leggings/boots/gloves/belt/amulet/ring/ring2, backpack if omitted.
-      Such items are written without a stats blob, like weapons in community-made templates.
-    items_from: "Campaign:Name" of a template whose items are copied as is (with their stats blobs).
-    reset_bonus: first drop all GM edits of the base (stats, abilities, talents), then apply your own.
-    talents / remove_talents: talents by their ositools names, e.g. ["Executioner", "Leech"].
+    Writes Eggs.lsf. The previous file is backed up first; undo with dos2_restore. Fails with an error while the game process is running unless allow_running=true.
+    The template only defines what the GM can place: it does not put a character into a scene (place it in the game,
+    or use dos2_live_spawn). Returns created (true for a new template), the resulting template in full and the
+    backup id. For item templates use dos2_put_item_template.
     """
     g = gm()
     d = g.resolve(campaign)
@@ -231,7 +359,22 @@ def dos2_put_npc_template(
     return {"created": created, "template": detail, **result}
 
 
-@mcp.tool()
+@tool("Create or replace an item template", destructive=True, idempotent=True,
+      campaign=CAMPAIGN,
+      name="Item template name. An existing item template with this name is replaced.",
+      base="What to start from. A built-in sample: \"quest\" (plain item, default), \"weapon\", \"weapon_generated\" "
+           "(has generated properties, required for boosts) or \"armor\"; or \"Campaign:Name\" of an existing item "
+           "template.",
+      template_id="Root template GUID of the item (its model). Omit to keep the base's.",
+      stats_id="Stats entry, e.g. WPN_Axe_2H or LOOT_Ore_A_BlackRock_A. Omit to keep the base's.",
+      level="Item level. Omit to keep the base's.",
+      rarity="One of Common, Uncommon, Rare, Epic, Legendary, Divine, Unique.",
+      description="Custom description shown in the item tooltip.",
+      book="Text shown when the item is read as a book or note.",
+      amount="Stack size.",
+      boosts="Generated-property boosts, e.g. [\"Boost_Weapon_Damage_Bonus_Large\"]. Only valid with a base that has "
+             "item generation, such as weapon_generated; otherwise the call fails.",
+      allow_running=ALLOW_RUNNING)
 def dos2_put_item_template(
     campaign: str,
     name: str,
@@ -246,13 +389,13 @@ def dos2_put_item_template(
     boosts: list[str] | None = None,
     allow_running: bool = False,
 ) -> dict:
-    """Creates or replaces an item template (the GM's saved item templates in the "Creatures and Items" panel).
+    """Creates a saved item template in the campaign (the Game Master's "Creatures and Items" panel), or replaces the
+    one with the same name. Use it for quest items, readable notes and books, and custom weapons or armor the GM
+    hands out.
 
-    base: a built-in sample: quest (not equipment), weapon, weapon_generated (has ItemGeneration: real properties
-    from boosts, e.g. Boost_Weapon_Damage_Bonus_Large), armor; or "Campaign:Name" of an existing item template.
-    template_id: the item's root template (model). stats_id: stats entry (WPN_Axe_2H, LOOT_Ore_A_BlackRock_A…).
-    rarity: Common, Uncommon, Rare, Epic, Legendary, Divine, Unique. description: item description.
-    book: text of a book or note.
+    Writes Eggs.lsf. The previous file is backed up first; undo with dos2_restore. Fails with an error while the game process is running unless allow_running=true.
+    Returns created (true for a new template), a summary of the template and the backup id. For NPC templates use
+    dos2_put_npc_template; to give an NPC template items, pass them in its items parameter instead.
     """
     g = gm()
     d = g.resolve(campaign)
@@ -266,13 +409,21 @@ def dos2_put_item_template(
     return {"created": created, "template": detail, **w.commit()}
 
 
-@mcp.tool()
+@tool("Replace the GM journal", destructive=True, idempotent=True,
+      campaign=CAMPAIGN,
+      categories="The whole journal, in display order: [{\"title\": \"...\", \"shared\": false, \"chapters\": [{\"title\": "
+                 "\"...\", \"shared\": false, \"paragraphs\": [{\"text\": \"...\", \"shared\": false}]}]}]. shared=true is "
+                 "meant to show the entry to players.",
+      allow_running=ALLOW_RUNNING)
 def dos2_put_journal(campaign: str, categories: list[dict], allow_running: bool = False) -> dict:
-    """Writes the whole GM journal (the previous one goes to a backup).
+    """Replaces the campaign's whole Game Master journal (categories, chapters, paragraphs) with the structure you
+    pass. Entries that are not in categories are removed, so read the current journal with dos2_campaign first and
+    send it back with your changes.
 
-    categories: [{"title": "...", "shared": false, "chapters": [{"title": "...", "shared": false,
-    "paragraphs": [{"text": "...", "shared": false}]}]}]. List order = order in the journal.
-    shared=true shows the entry to players (not verified against samples; the GM can also enable it in the game)."""
+    Writes Journal.lsf. The previous file is backed up first; undo with dos2_restore. Fails with an error while the game process is running unless allow_running=true.
+    The shared flag was not verified against Larian's samples; the GM can also share entries in the game. Returns
+    the backup id and the journal as it now reads.
+    """
     g = gm()
     d = g.resolve(campaign)
     w = g.writer(d, "journal", allow_running)
@@ -281,12 +432,25 @@ def dos2_put_journal(campaign: str, categories: list[dict], allow_running: bool 
     return {**out, "journal": g.journal(d)}
 
 
-@mcp.tool()
+@tool("Edit scene name, atmosphere, music", destructive=True, idempotent=True,
+      campaign=CAMPAIGN,
+      scene="Scene name or scene ID, as listed by dos2_campaign.",
+      name="New scene name. Omit to keep.",
+      folder="Folder the scene is filed under in the GM's scene list. Omit to keep.",
+      atmosphere="Atmosphere GUID (one of the game's ATM_* atmospheres). Empty string restores the level default.",
+      ambient="Ambient sound name (Soundvol_*). Empty string restores the level default.",
+      music="Music track name (GM_*). Empty string restores the level default.",
+      allow_running=ALLOW_RUNNING)
 def dos2_scene_settings(campaign: str, scene: str, name: str | None = None, folder: str | None = None,
                         atmosphere: str | None = None, ambient: str | None = None, music: str | None = None,
                         allow_running: bool = False) -> dict:
-    """Changes a scene in GMScenes.lsf: name, folder, atmosphere (a GUID from ATM_*), ambient sound (Soundvol_*) and
-    music (GM_*). An empty string restores the level's default value."""
+    """Changes the settings of one scene in GMScenes.lsf: its name, folder, atmosphere (lighting and weather), ambient
+    sound and music. Only the fields you pass change; an empty string resets that field to the level's default.
+
+    It does not change what is placed in the scene: characters and items are placed in the game or with the
+    dos2_live_* tools. The previous file is backed up first; undo with dos2_restore. Fails with an error while the game process is running unless allow_running=true.
+    Returns the backup id and the scene entry as it now reads.
+    """
     g = gm()
     d = g.resolve(campaign)
     s = g.resolve_scene(d, scene)
@@ -300,9 +464,17 @@ def dos2_scene_settings(campaign: str, scene: str, name: str | None = None, fold
     return {**out, "scene": entry}
 
 
-@mcp.tool()
+@tool("Delete a saved template", destructive=True,
+      campaign=CAMPAIGN,
+      name="Exact template name (case-insensitive), as listed by dos2_templates.",
+      allow_running=ALLOW_RUNNING)
 def dos2_delete_template(campaign: str, name: str, allow_running: bool = False) -> dict:
-    """Deletes an NPC or item template by name. The previous Eggs.lsf goes to a backup."""
+    """Deletes a saved NPC or item template from the campaign by name. If an NPC template and an item template share
+    the name, both are removed. Characters already placed in scenes from that template stay as they are.
+
+    Writes Eggs.lsf. The previous file is backed up first; undo with dos2_restore. Fails with an error while the game process is running unless allow_running=true.
+    Fails with an error when no template has that name. Returns the number of templates removed and the backup id.
+    """
     g = gm()
     d = g.resolve(campaign)
     w = g.writer(d, "delete-template", allow_running)
@@ -317,7 +489,21 @@ def dos2_delete_template(campaign: str, name: str, allow_running: bool = False) 
 
 # --- vignettes ---------------------------------------------------------------------------
 
-@mcp.tool()
+@tool("Create or replace a vignette", destructive=True, idempotent=True,
+      campaign=CAMPAIGN,
+      title="Vignette title. Without key, an existing vignette with the same title is replaced.",
+      text="The story text shown on the card.",
+      answers="Answer options offered to the players for a vote. Omit for a vignette without a vote.",
+      question="The question shown above the answers. Default empty.",
+      image="Absolute path to your own PNG (square, transparent background works best). It is copied into the "
+            "campaign. Omit to use stock_image.",
+      stock_image="File name of one of the game's stock vignette pictures, used when image is omitted.",
+      folder="Folder the vignette is filed under in the GM's resources list. Default none.",
+      key="Stable identifier of your choice. The vignette's UUID is derived from it, so the same key always "
+          "addresses the same vignette even after its title changes.",
+      canvas="File name of the paper background. Keep the default unless you know another stock canvas.",
+      frame="File name of the border decoration. Keep the default unless you know another stock frame.",
+      allow_running=ALLOW_RUNNING)
 def dos2_put_vignette(
     campaign: str,
     title: str,
@@ -332,13 +518,13 @@ def dos2_put_vignette(
     frame: str = "GM_Border_Deco_01_A.png",
     allow_running: bool = False,
 ) -> dict:
-    """Creates or replaces a vignette.
+    """Creates a vignette (an illustrated story card the Game Master shows to players, optionally with a vote), or
+    replaces an existing one. The vignette to replace is found by key if given, otherwise by an equal title;
+    otherwise a new one is created.
 
-    The vignette to replace is found by key (the UUID is derived from the key, so the same key always addresses
-    the same vignette), otherwise by an equal title. image: path to your own PNG (a square with a transparent
-    background, like Larian's); the file is copied to Vignettes/Illustrations and Previews. Without image the
-    stock picture stock_image is used. folder: the vignette's folder in the resources list. answers: the answer
-    options offered to players.
+    Writes Vignettes.lsf and, with image, copies the picture into the campaign's Vignettes/Illustrations. The previous file is backed up first; undo with dos2_restore.
+    Fails with an error while the game process is running unless allow_running=true. Fails with an error if the image file does not exist. Returns created, the vignette's uuid, the image
+    name and size, and the backup id. Read existing vignettes with dos2_vignettes.
     """
     g = gm()
     d = g.resolve(campaign)
@@ -367,9 +553,17 @@ def dos2_put_vignette(
     return {"created": created, "uuid": uid, "image": img_name, "image_size": size, **w.commit()}
 
 
-@mcp.tool()
+@tool("Delete a vignette", destructive=True,
+      campaign=CAMPAIGN,
+      vignette="The vignette's UUID or its exact title (case-insensitive), as listed by dos2_vignettes.",
+      allow_running=ALLOW_RUNNING)
 def dos2_delete_vignette(campaign: str, vignette: str, allow_running: bool = False) -> dict:
-    """Deletes a vignette by UUID or title. Images in Illustrations are kept."""
+    """Deletes one vignette from the campaign, found by UUID or exact title. Its picture files stay in the campaign's
+    Vignettes/Illustrations folder, so other vignettes that use the same image keep working.
+
+    Writes Vignettes.lsf. The previous file is backed up first; undo with dos2_restore. Fails with an error while the game process is running unless allow_running=true.
+    Fails with an error when nothing matches. Returns the UUIDs removed and the backup id.
+    """
     g = gm()
     d = g.resolve(campaign)
     w = g.writer(d, "delete-vignette", allow_running)
@@ -385,7 +579,18 @@ def dos2_delete_vignette(campaign: str, vignette: str, allow_running: bool = Fal
 
 # --- sticky notes -------------------------------------------------------------------------------
 
-@mcp.tool()
+@tool("Create or update a GM sticky note", destructive=True, idempotent=True,
+      campaign=CAMPAIGN,
+      title="Note title. Without key, an existing note with the same title is updated.",
+      text="Note text. Line breaks are kept.",
+      folder="Folder the note is filed under in the notes overview. Omit to keep the current one.",
+      map="Overview map to put the note on: the map's title or UUID from dos2_campaign. May be omitted when the "
+          "campaign has exactly one map or the note already exists.",
+      x="Horizontal position on the map in map pixels. Default 600 for a new note.",
+      y="Vertical position on the map in map pixels. Default 400 for a new note.",
+      key="Stable identifier of your choice. The note's UUID is derived from it, so the same key always addresses "
+          "the same note even after its title changes.",
+      allow_running=ALLOW_RUNNING)
 def dos2_put_note(
     campaign: str,
     title: str,
@@ -397,13 +602,16 @@ def dos2_put_note(
     key: str | None = None,
     allow_running: bool = False,
 ) -> dict:
-    """Creates or changes a GM sticky note (players do not see it).
+    """Creates a Game Master sticky note on an Overview map, or changes an existing note. Players never see these
+    notes. An existing note is found by key if given, otherwise by an equal title; if none matches, a new one is
+    created on the map.
 
-    A new note goes onto an Overview map: map is the map's title or UUID (from dos2_campaign), x and y are map
-    pixels (600, 400 if omitted). A note in a scene is attached to an invisible marker item of the level, so new
-    scene notes have to be placed in the game; for one that already exists, this tool changes the title, text
-    and folder and keeps the binding. An existing note is found by key, otherwise by title. folder: the folder
-    in the notes overview.
+    A note inside a scene hangs on an invisible marker item of the level, so new scene notes have to be placed in
+    the game; for one that already exists this tool changes title, text and folder and keeps its binding.
+
+    Writes Notes.lsf. The previous file is backed up first; undo with dos2_restore. Fails with an error while the game process is running unless allow_running=true.
+    Fails with an error if the map is not found or has to be specified. Returns created, the note's uuid, where it
+    sits and the backup id. Read notes with dos2_notes; remove one with dos2_delete_note.
     """
     g = gm()
     d = g.resolve(campaign)
@@ -446,9 +654,18 @@ def dos2_put_note(
     return {"created": created, "uuid": uid, **target, **w.commit()}
 
 
-@mcp.tool()
+@tool("Delete a GM sticky note", destructive=True,
+      campaign=CAMPAIGN,
+      note="The note's UUID or its exact title (case-insensitive), as listed by dos2_notes.",
+      allow_running=ALLOW_RUNNING)
 def dos2_delete_note(campaign: str, note: str, allow_running: bool = False) -> dict:
-    """Deletes a sticky note by UUID or title."""
+    """Deletes one Game Master sticky note from the campaign, found by UUID or exact title. Works for notes on an
+    Overview map and for notes bound to an object in a scene.
+
+    Writes Notes.lsf. The previous file is backed up first; undo with dos2_restore. Fails with an error while the game process is running unless allow_running=true.
+    Fails with an error when nothing matches. Returns the UUIDs removed and the backup id. To change a note's text
+    instead, use dos2_put_note.
+    """
     g = gm()
     d = g.resolve(campaign)
     w = g.writer(d, "delete-note", allow_running)
@@ -464,26 +681,48 @@ def dos2_delete_note(campaign: str, note: str, allow_running: bool = False) -> d
 
 # --- backups ----------------------------------------------------------------------------------
 
-@mcp.tool()
+@tool("Back up the whole campaign",
+      campaign=CAMPAIGN)
 def dos2_backup(campaign: str) -> dict:
-    """Full copy of the campaign folder into the backups."""
+    """Copies the entire campaign folder into the backups folder as a new backup labelled "full". Nothing in the
+    campaign changes, and it is safe while the game is running.
+
+    Every write tool already backs up the files it touches, so use this for a complete snapshot before a risky
+    series of edits or before a play session. Returns the backup id and its path. List backups with dos2_backups
+    and bring one back with dos2_restore.
+    """
     g = gm()
     d = g.resolve(campaign)
     bid = g.full_backup(d)
     return {"backup": bid, "path": str(g.backup_root(d) / bid)}
 
 
-@mcp.tool()
+@tool("List campaign backups", read_only=True,
+      campaign=CAMPAIGN)
 def dos2_backups(campaign: str) -> list[dict]:
-    """The campaign's backups, newest first: what was saved and which files the operation created."""
+    """Lists the campaign's backups, newest first. Each entry has the id (timestamp plus operation label, e.g.
+    "...-npc-template" or "...-full"), the label, the files that were saved, and the files that the operation
+    created.
+
+    Read-only. Use it to find the id to pass to dos2_restore when an edit has to be undone. Returns an empty list
+    when the campaign has no backups yet.
+    """
     g = gm()
     return g.backups(g.resolve(campaign))
 
 
-@mcp.tool()
+@tool("Restore a backup", destructive=True,
+      campaign=CAMPAIGN,
+      backup="Backup id exactly as listed by dos2_backups.",
+      allow_running=ALLOW_RUNNING)
 def dos2_restore(campaign: str, backup: str, allow_running: bool = False) -> dict:
-    """Restores the files from a backup and deletes the files that operation created.
-    The current state of those files is itself backed up first, labelled "before-restore"."""
+    """Undoes an earlier write: puts back the files saved in the given backup and deletes the files that the backed-up
+    operation had created. Restoring a "full" backup brings back every file of the campaign.
+
+    The current state of the affected files is itself backed up first under the label "before-restore", so a
+    restore can be undone too. Fails with an error while the game process is running unless allow_running=true. Fails with an error when the backup id does not exist. Returns the id of
+    the before-restore backup and restored_from.
+    """
     g = gm()
     return g.restore(g.resolve(campaign), backup, allow_running)
 
@@ -525,11 +764,17 @@ def _where(x, y, z, near, dx, dz) -> tuple[float, float, float]:
     return x, y, z
 
 
-@mcp.tool()
+@tool("Live layer readiness", read_only=True)
 def dos2_live_status() -> dict:
-    """Live layer readiness: whether the game is running, Script Extender is installed, the bridge is built, which
-    campaigns it is attached to, and whether its heartbeat is coming in (the bridge writes it every ~2 s while a
-    campaign is loaded)."""
+    """Checks everything the live tools (dos2_live_*) need and reports what is missing: whether the game is running,
+    whether Script Extender is installed next to the game and its settings, whether the bridge mod .pak is built,
+    which campaigns have it attached, and whether the bridge's heartbeat is coming in (it writes one about every
+    2 seconds while a campaign is loaded in Game Master mode).
+
+    Read-only, no parameters. Call it before the first live tool of a session and whenever a live tool times out.
+    If the bridge is not built or attached, run dos2_bridge_install with the game closed. For file-level setup
+    (campaign list, Divine.exe) use dos2_status.
+    """
     g = gm()
     p = g.paths
     se = {"game_dir": str(p.game) if p.game else None}
@@ -550,10 +795,20 @@ def dos2_live_status() -> dict:
             "bridge_pak": str(pak) if pak.exists() else None, "attached_to": attached, "bridge": bridge().status()}
 
 
-@mcp.tool()
+@tool("Build and attach the bridge mod", destructive=True, idempotent=True,
+      campaign="Campaign to attach the bridge to as an add-on (name, folder, UUID or a part). Omit to only build "
+               "the .pak.",
+      allow_running=ALLOW_RUNNING)
 def dos2_bridge_install(campaign: str | None = None, allow_running: bool = False) -> dict:
-    """Builds the bridge mod into Mods\\DOS2GMBridge_….pak and, if campaign is given, attaches it to the campaign
-    as an add-on (meta.lsf → Dependencies, with a backup). Players need this .pak too, like any add-on."""
+    """Builds this server's bridge mod into the game's Mods folder (DOS2GMBridge_....pak, overwriting the previous
+    build) and, when campaign is given, adds it to that campaign's add-ons in meta.lsf. The bridge is what the
+    dos2_live_* tools talk to; it needs Script Extender in the game.
+
+    The previous file is backed up first; undo with dos2_restore. Attaching: Fails with an error while the game process is running unless allow_running=true.
+    In multiplayer every player needs the same .pak and Script Extender, as with any add-on; after a rebuild, send
+    them the new file. Returns the .pak path, the packed files and the campaign's add-on list. Check the result
+    with dos2_live_status; remove with dos2_bridge_detach.
+    """
     g = gm()
     pak = g.paths.mods / f"{BRIDGE_FOLDER}.pak"
     files = g.divine.package(BRIDGE_SRC, pak)
@@ -569,12 +824,21 @@ def dos2_bridge_install(campaign: str | None = None, allow_running: bool = False
     return out
 
 
-@mcp.tool()
+@tool("Build a mod folder and attach it", destructive=True, idempotent=True,
+      source="Absolute path to the mod's source folder; it must contain exactly one Mods/<mod folder>/meta.lsx.",
+      campaign="Campaign to attach the mod to as an add-on (name, folder, UUID or a part). Omit to only build the "
+               ".pak.",
+      allow_running=ALLOW_RUNNING)
 def dos2_mod_install(source: str, campaign: str | None = None, allow_running: bool = False) -> dict:
-    """Builds a mod from the source folder (it contains Mods/<mod folder>/meta.lsx) into Mods\\<mod folder>.pak and,
-    if campaign is given, attaches it to the campaign as an add-on. UUID, name, version and folder are taken from
-    the mod's meta.lsx. Note: PublishVersion in meta.lsx must be a Definitive Edition editor version (e.g.
-    909321303), otherwise the game marks the mod as made for the Classic Edition and does not enable it."""
+    """Packs your own mod from a source folder into the game's Mods folder as <mod folder>.pak (overwriting a previous
+    build) and, when campaign is given, adds it to that campaign's add-ons. UUID, name, version and folder come
+    from the mod's meta.lsx.
+
+    Use it for mods you develop yourself; for a ready third-party .pak use dos2_addon, and for this server's bridge
+    use dos2_bridge_install. Fails if PublishVersion in meta.lsx is below a Definitive Edition editor version (use
+    909321303): the game would mark the mod as Classic and refuse it. The previous file is backed up first; undo with dos2_restore. Attaching: Fails with an error while the game process is running unless allow_running=true.
+    Returns the .pak path, packed files, module name and UUID, and the add-on list.
+    """
     import xml.etree.ElementTree as ET
     g = gm()
     src = Path(source)
@@ -600,11 +864,21 @@ def dos2_mod_install(source: str, campaign: str | None = None, allow_running: bo
     return out
 
 
-@mcp.tool()
+@tool("Attach or detach a .pak add-on", destructive=True, idempotent=True,
+      campaign=CAMPAIGN,
+      pak="Absolute path to the mod's .pak file.",
+      attach="true (default) attaches the mod; false removes it from the campaign's add-ons.",
+      allow_running=ALLOW_RUNNING)
 def dos2_addon(campaign: str, pak: str, attach: bool = True, allow_running: bool = False) -> dict:
-    """Attaches a ready-made third-party mod from a .pak file to the campaign (attach=False detaches it). The file
-    is copied to Mods; UUID, name, version and folder are taken from meta.lsx inside the pak. Players need this
-    .pak too."""
+    """Attaches a ready-made mod from a .pak file to the campaign as an add-on, or detaches it with attach=false. On
+    attach the file is copied into the game's Mods folder; UUID, name, version and folder are read from the
+    meta.lsx inside the pak. Detaching leaves the .pak in Mods.
+
+    Writes meta.lsf. The previous file is backed up first; undo with dos2_restore. Fails with an error while the game process is running unless allow_running=true.
+    Players need the same .pak, as with any add-on. Fails if the file is missing or holds no single meta.lsx.
+    Returns the module name, author, UUID, the .pak path and the campaign's add-on list. To build a mod from a
+    source folder use dos2_mod_install.
+    """
     import os
     import shutil
     import subprocess
@@ -637,9 +911,17 @@ def dos2_addon(campaign: str, pak: str, attach: bool = True, allow_running: bool
             "addons": g.meta(d)["addons"]}
 
 
-@mcp.tool()
+@tool("Detach the bridge mod", destructive=True, idempotent=True,
+      campaign=CAMPAIGN,
+      allow_running=ALLOW_RUNNING)
 def dos2_bridge_detach(campaign: str, allow_running: bool = False) -> dict:
-    """Detaches the bridge mod from the campaign (meta.lsf → Dependencies, with a backup). The .pak stays in Mods."""
+    """Removes this server's bridge mod from the campaign's add-ons in meta.lsf. After that the dos2_live_* tools no
+    longer work for this campaign, and players no longer need the bridge .pak. The .pak itself stays in the game's
+    Mods folder, and nothing happens if the bridge was not attached.
+
+    The previous file is backed up first; undo with dos2_restore. Fails with an error while the game process is running unless allow_running=true.
+    Returns the backup id and the campaign's add-on list. Attach again with dos2_bridge_install.
+    """
     g = gm()
     d = g.resolve(campaign)
     w = g.writer(d, "bridge-detach", allow_running)
@@ -650,17 +932,37 @@ def dos2_bridge_detach(campaign: str, allow_running: bool = False) -> dict:
     return {**out, "addons": g.meta(d)["addons"]}
 
 
-@mcp.tool()
+@tool("List characters on the live level", read_only=True,
+      near="Only list characters around this one (GUID or name). Omit to list the whole level.",
+      radius="Radius in metres around near (default 8). Ignored without near.",
+      limit="Maximum number of characters to return (default 200).")
 def dos2_live_characters(near: str | None = None, radius: float = 8.0, limit: int = 200) -> list[dict]:
-    """Characters on the loaded level: GUID, name, root template, stats, level, vitality, alignment, position.
-    near: a character's name or GUID; then only those within radius metres of that character."""
+    """Lists the characters on the level currently loaded in the running game, player characters included: GUID, name,
+    root template, stats entry, level, vitality, alignment and position. With near it returns only those within
+    radius of that character.
+
+    Read-only; needs the game running with the bridge mod (see dos2_live_status), otherwise it fails with a timeout
+    error. Use it to get GUIDs and positions for dos2_live_move, dos2_live_set, dos2_live_stage and
+    dos2_live_spawn. For what is saved in the campaign files rather than the running game, use dos2_scene.
+    """
     if near:
         x, y, z = _who(near)["pos"]
         return bridge().call("characters", {"x": x, "y": y, "z": z, "radius": radius, "limit": limit})
     return bridge().call("characters", {"limit": limit})
 
 
-@mcp.tool()
+@tool("Spawn a character in the live game",
+      template="Root template GUID, or the name of a saved GM NPC template (then campaign is required).",
+      campaign="Campaign that holds the GM template named in template. Not needed for a root template GUID.",
+      x="World X coordinate in metres. Give all of x, y, z, or use near instead.",
+      y="World Y (height) coordinate in metres. Give all of x, y, z, or use near instead.",
+      z="World Z coordinate in metres. Give all of x, y, z, or use near instead.",
+      near="Place relative to this character (GUID or name) instead of giving x, y, z.",
+      dx="Offset in metres along X from the near character (default 1.5). Ignored without near.",
+      dz="Offset in metres along Z from the near character (default 0). Ignored without near.",
+      name="Name shown above the head. Defaults to the GM template's name.",
+      level="Character level. Defaults to the GM template's level.",
+      alignment="\"Neutral NPC\", \"Evil NPC\" (hostile) or \"Good NPC\" (ally). Defaults to the GM template's.")
 def dos2_live_spawn(
     template: str,
     campaign: str | None = None,
@@ -674,14 +976,14 @@ def dos2_live_spawn(
     level: int | None = None,
     alignment: str | None = None,
 ) -> dict:
-    """Spawns a character on the loaded level.
+    """Creates a new character on the level loaded in the running game, at a point or next to another character. Each
+    call adds one more character, so repeating it makes duplicates; take one away with dos2_live_stage.
 
-    template: a root template GUID, or the name of a GM template from campaign (then the model, level, alignment
-    and name come from that template; its stat edits, skills and items are NOT carried over this way: only
-    placing it from the "Creatures and Items" panel in the game applies them). Position: x, y, z, or near (a
-    character's name/GUID) with offset dx, dz. During GM pause the character is created at once but moves into
-    place only after unpausing: the result then has applies_on_unpause=true and the position is still 0, 0, 0
-    (verified in the game).
+    From a GM template only the model, level, alignment and name are used: its stat edits, skills and items are NOT
+    applied this way (placing it from the game's "Creatures and Items" panel applies them). During the Game Master
+    pause the character is created at once but moves into place only after unpausing: the result then has
+    applies_on_unpause=true and its position still reads 0, 0, 0. Needs the bridge (see dos2_live_status). Returns
+    the new character's GUID and state.
     """
     if not GUID_RE.search(template):
         if not campaign:
@@ -699,35 +1001,79 @@ def dos2_live_spawn(
                                    "level": level, "alignment": alignment})
 
 
-@mcp.tool()
+@tool("Teleport a live character", idempotent=True,
+      who="The character to act on: its GUID, its exact name, or a unique part of its name (see "
+          "dos2_live_characters).",
+      x="World X coordinate in metres. Give all of x, y, z, or use near instead.",
+      y="World Y (height) coordinate in metres. Give all of x, y, z, or use near instead.",
+      z="World Z coordinate in metres. Give all of x, y, z, or use near instead.",
+      near="Place relative to this character (GUID or name) instead of giving x, y, z.",
+      dx="Offset in metres along X from the near character (default 1.5). Ignored without near.",
+      dz="Offset in metres along Z from the near character (default 0). Ignored without near.")
 def dos2_live_move(who: str, x: float | None = None, y: float | None = None, z: float | None = None,
                    near: str | None = None, dx: float = 1.5, dz: float = 0.0) -> dict:
-    """Moves a character (name or GUID) to the point x, y, z, or next to the character near with offset dx, dz.
-    During GM pause the move is applied after unpausing (applies_on_unpause=true in the result)."""
+    """Teleports one character on the live level to the point x, y, z, or next to another character with the offset
+    dx, dz. Works on NPCs and on player characters.
+
+    Changes only the running game, not the campaign files. During the Game Master pause the move is applied after
+    unpausing (the result has applies_on_unpause=true). Fails with an error when who matches no character or more
+    than one (then pass a GUID), or when neither a full x, y, z nor near is given. Needs the bridge (see
+    dos2_live_status). Get positions from dos2_live_characters.
+    """
     guid = _who(who)["guid"]
     px, py, pz = _where(x, y, z, near, dx, dz)
     return bridge().call("move", {"guid": guid, "x": px, "y": py, "z": pz})
 
 
-@mcp.tool()
+@tool("Rename, level up or re-align a live character", idempotent=True,
+      who="The character to act on: its GUID, its exact name, or a unique part of its name (see "
+          "dos2_live_characters).",
+      name="New name shown above the character's head. Omit to keep.",
+      level="New level. Levels can only go up; a lower value is ignored by the game. Omit to keep.",
+      alignment="\"Neutral NPC\", \"Evil NPC\" (hostile to the party) or \"Good NPC\" (ally). Omit to keep.")
 def dos2_live_set(who: str, name: str | None = None, level: int | None = None,
                   alignment: str | None = None) -> dict:
-    """Changes a placed character: name above the head, level (up only), alignment ("Evil NPC" etc.)."""
+    """Changes a character that already stands on the live level: its displayed name, its level and its alignment
+    towards the party. Only the fields you pass change.
+
+    Changes only the running game, not the campaign files or the template the character came from. Setting
+    alignment to "Evil NPC" makes the character hostile, which can start combat. Fails with an error when who
+    matches no character or more than one (then pass a GUID). Needs the bridge (see dos2_live_status). Returns the
+    character's new state. To move a character use dos2_live_move; to hide one use dos2_live_stage.
+    """
     guid = _who(who)["guid"]
     return bridge().call("set", {"guid": guid, "name": name, "level": level, "alignment": alignment})
 
 
-@mcp.tool()
+@tool("Hide or show a live character", idempotent=True,
+      who="The character to act on: its GUID, its exact name, or a unique part of its name (see "
+          "dos2_live_characters).",
+      on="false takes the character off stage (hidden and inactive); true brings it back.")
 def dos2_live_stage(who: str, on: bool) -> dict:
-    """Takes a character off stage (on=false) or brings it back (on=true). An off-stage character stays in the level."""
+    """Takes a character on the live level off stage or brings it back. An off-stage character is invisible and takes
+    no part in the scene but stays in the level with its state, so this is the reversible way to remove an NPC or
+    to prepare one for a later entrance; nothing is deleted.
+
+    Changes only the running game. Fails with an error when who matches no character or more than one (then pass a
+    GUID). Needs the bridge (see dos2_live_status). Returns the character's new state.
+    """
     guid = _who(who)["guid"]
     return bridge().call("stage", {"guid": guid, "on": on})
 
 
-@mcp.tool()
+@tool("Run Lua in the live game", destructive=True,
+      code="Lua source to run. Use return to send a value back, e.g. return Osi.CharacterGetHostCharacter().",
+      timeout="Seconds to wait for the game's answer (default 5).")
 def dos2_live_lua(code: str, timeout: float = 5.0):
-    """Runs Lua on the game server (Script Extender, in the bridge mod's context) and returns the value of return.
-    Ext and Osi are available, e.g.: return Osi.CharacterGetHostCharacter(). The result must be JSON-serializable."""
+    """Runs arbitrary Lua on the game server through Script Extender, in the bridge mod's context, and returns the
+    value of its return statement. The Ext and Osi APIs are available. This is the escape hatch for anything the
+    other live tools do not cover: items, statuses, combat, level changes.
+
+    It can change or break anything in the running session, so prefer the dedicated tools (dos2_live_characters,
+    dos2_live_spawn, dos2_live_move, dos2_live_set, dos2_live_stage) when they fit. The returned value must be
+    JSON-serializable. Lua errors come back as an error with the message; a call that outlives timeout fails. Needs
+    the bridge (see dos2_live_status). Do not call Osi functions while a level is still loading.
+    """
     return bridge().call("lua", {"code": code}, timeout=timeout)
 
 

@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "dos2-gm-mcp",
   "display_name": "DOS2 Game Master",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Divinity: Original Sin 2 Game Master mode: edit campaign files, drive the live game via a bridge mod",
   "long_description": "Prepare and run Game Master mode campaigns in Divinity: Original Sin 2 - Definitive Edition. Reads and edits campaign files through LSLib (NPC and item templates, vignettes, map stickies, journal, scene atmosphere, add-on mods) with a backup before every write, and drives the running game through a small Script Extender bridge mod (list, spawn, move, rename characters, run Lua). After installing, ask the assistant to call dos2_fetch_lslib once. Needs Windows, uv and the .NET 8 runtime.",
   "author": {
@@ -43,139 +43,139 @@
   "tools": [
     {
       "name": "dos2_status",
-      "description": "Paths (campaigns, Divine.exe, backups), whether the game is running, and the list of GM campaigns."
+      "description": "Reports the server's setup and lists the GM campaigns."
     },
     {
       "name": "dos2_fetch_lslib",
-      "description": "One-time setup: downloads the official LSLib release by Norbyte (Divine.exe, MIT license) from GitHub, checks its pinned SHA-256 and unpacks it into the data folder."
+      "description": "One-time setup: downloads the official LSLib release by Norbyte (Divine.exe, MIT license) from GitHub, verifies its pinned SHA-256 and unpacks it into the server's data folder."
     },
     {
       "name": "dos2_campaign",
-      "description": "Campaign summary: metadata and add-ons, scenes, maps with pins, vignettes, templates, sticky notes, journal."
+      "description": "Reads one campaign and returns a compact overview: metadata and attached add-on mods, scenes, Overview maps with their pins, vignettes (uuid, title, answers), NPC and item templates (kind, name, level), sticky notes (..."
     },
     {
       "name": "dos2_campaign_meta",
-      "description": "Changes the campaign name, description and author in meta.lsf (same as editing campaign metadata in the game)."
+      "description": "Changes the campaign's name, description and author in meta.lsf, the same fields the game edits in its campaign settings."
     },
     {
       "name": "dos2_scene",
-      "description": "Scene contents from LevelCache: characters (name, root template, position, vitality, experience, alignment, encounter), encounters with their members, item count, the scene's sticky notes."
+      "description": "Reads what the Game Master has placed in one scene, from the campaign files (LevelCache): characters with name, root template, position, vitality, experience, alignment and encounter; encounters with their members; th..."
     },
     {
       "name": "dos2_templates",
-      "description": "Campaign templates from Eggs.lsf: kind = \"npc\", \"item\", or empty for all."
+      "description": "Lists the campaign's saved Game Master templates (the \"Creatures and Items\" panel, stored in Eggs.lsf) as short summaries."
     },
     {
       "name": "dos2_template",
-      "description": "A full template: base stats, GM edits, abilities, talents, skills, skill bar, items."
+      "description": "Returns one saved Game Master template of the campaign in full: for an NPC its base stats, the GM's stat edits, abilities, talents, skills, skill bar and items with slots; for an item all of its attributes."
     },
     {
       "name": "dos2_find_templates",
-      "description": "Searches templates in all campaigns (or in one) by a substring of the name, StatName, root template, skills and items."
+      "description": "Searches saved Game Master templates in every campaign on disk (or in one) and returns matching summaries with the campaign each one lives in."
     },
     {
       "name": "dos2_vignettes",
-      "description": "The campaign's vignettes in full: title, text, question, answers, image."
+      "description": "Returns every vignette of the campaign with its full content: uuid, title, text, question, answer options, image and folder."
     },
     {
       "name": "dos2_notes",
-      "description": "GM sticky notes: on an Overview map (kind=map) and in scenes, bound to an object (kind=scene)."
+      "description": "Returns all Game Master sticky notes of the campaign with their full text."
     },
     {
       "name": "dos2_raw",
-      "description": "A campaign file as LSX text, for exploring the formats."
+      "description": "Converts any binary campaign file (.lsf) to LSX text and returns it, whole or filtered by XPath."
     },
     {
       "name": "dos2_put_npc_template",
-      "description": "Creates or changes an NPC template (the GM's saved templates in the \"Creatures and Items\" panel)."
+      "description": "Creates a saved NPC template in the campaign (the Game Master's \"Creatures and Items\" panel), or changes the one that already has this name."
     },
     {
       "name": "dos2_put_item_template",
-      "description": "Creates or replaces an item template (the GM's saved item templates in the \"Creatures and Items\" panel)."
+      "description": "Creates a saved item template in the campaign (the Game Master's \"Creatures and Items\" panel), or replaces the one with the same name."
     },
     {
       "name": "dos2_put_journal",
-      "description": "Writes the whole GM journal (the previous one goes to a backup)."
+      "description": "Replaces the campaign's whole Game Master journal (categories, chapters, paragraphs) with the structure you pass."
     },
     {
       "name": "dos2_scene_settings",
-      "description": "Changes a scene in GMScenes.lsf: name, folder, atmosphere (a GUID from ATM_*), ambient sound (Soundvol_*) and music (GM_*)."
+      "description": "Changes the settings of one scene in GMScenes.lsf: its name, folder, atmosphere (lighting and weather), ambient sound and music."
     },
     {
       "name": "dos2_delete_template",
-      "description": "Deletes an NPC or item template by name."
+      "description": "Deletes a saved NPC or item template from the campaign by name."
     },
     {
       "name": "dos2_put_vignette",
-      "description": "Creates or replaces a vignette."
+      "description": "Creates a vignette (an illustrated story card the Game Master shows to players, optionally with a vote), or replaces an existing one."
     },
     {
       "name": "dos2_delete_vignette",
-      "description": "Deletes a vignette by UUID or title."
+      "description": "Deletes one vignette from the campaign, found by UUID or exact title."
     },
     {
       "name": "dos2_put_note",
-      "description": "Creates or changes a GM sticky note (players do not see it)."
+      "description": "Creates a Game Master sticky note on an Overview map, or changes an existing note."
     },
     {
       "name": "dos2_delete_note",
-      "description": "Deletes a sticky note by UUID or title."
+      "description": "Deletes one Game Master sticky note from the campaign, found by UUID or exact title."
     },
     {
       "name": "dos2_backup",
-      "description": "Full copy of the campaign folder into the backups."
+      "description": "Copies the entire campaign folder into the backups folder as a new backup labelled \"full\"."
     },
     {
       "name": "dos2_backups",
-      "description": "The campaign's backups, newest first: what was saved and which files the operation created."
+      "description": "Lists the campaign's backups, newest first."
     },
     {
       "name": "dos2_restore",
-      "description": "Restores the files from a backup and deletes the files that operation created."
+      "description": "Undoes an earlier write: puts back the files saved in the given backup and deletes the files that the backed-up operation had created."
     },
     {
       "name": "dos2_live_status",
-      "description": "Live layer readiness: whether the game is running, Script Extender is installed, the bridge is built, which campaigns it is attached to, and whether its heartbeat is coming in (the bridge writes it..."
+      "description": "Checks everything the live tools (dos2_live_*) need and reports what is missing: whether the game is running, whether Script Extender is installed next to the game and its settings, whether the bridge mod .pak is buil..."
     },
     {
       "name": "dos2_bridge_install",
-      "description": "Builds the bridge mod into Mods\\DOS2GMBridge_….pak and, if campaign is given, attaches it to the campaign as an add-on (meta.lsf → Dependencies, with a backup)."
+      "description": "Builds this server's bridge mod into the game's Mods folder (DOS2GMBridge_....pak, overwriting the previous build) and, when campaign is given, adds it to that campaign's add-ons in meta.lsf."
     },
     {
       "name": "dos2_mod_install",
-      "description": "Builds a mod from the source folder (it contains Mods/<mod folder>/meta.lsx) into Mods\\<mod folder>.pak and, if campaign is given, attaches it to the campaign as an add-on."
+      "description": "Packs your own mod from a source folder into the game's Mods folder as <mod folder>.pak (overwriting a previous build) and, when campaign is given, adds it to that campaign's add-ons."
     },
     {
       "name": "dos2_addon",
-      "description": "Attaches a ready-made third-party mod from a .pak file to the campaign (attach=False detaches it)."
+      "description": "Attaches a ready-made mod from a .pak file to the campaign as an add-on, or detaches it with attach=false."
     },
     {
       "name": "dos2_bridge_detach",
-      "description": "Detaches the bridge mod from the campaign (meta.lsf → Dependencies, with a backup)."
+      "description": "Removes this server's bridge mod from the campaign's add-ons in meta.lsf."
     },
     {
       "name": "dos2_live_characters",
-      "description": "Characters on the loaded level: GUID, name, root template, stats, level, vitality, alignment, position."
+      "description": "Lists the characters on the level currently loaded in the running game, player characters included: GUID, name, root template, stats entry, level, vitality, alignment and position."
     },
     {
       "name": "dos2_live_spawn",
-      "description": "Spawns a character on the loaded level."
+      "description": "Creates a new character on the level loaded in the running game, at a point or next to another character."
     },
     {
       "name": "dos2_live_move",
-      "description": "Moves a character (name or GUID) to the point x, y, z, or next to the character near with offset dx, dz."
+      "description": "Teleports one character on the live level to the point x, y, z, or next to another character with the offset dx, dz."
     },
     {
       "name": "dos2_live_set",
-      "description": "Changes a placed character: name above the head, level (up only), alignment (\"Evil NPC\" etc.)."
+      "description": "Changes a character that already stands on the live level: its displayed name, its level and its alignment towards the party."
     },
     {
       "name": "dos2_live_stage",
-      "description": "Takes a character off stage (on=false) or brings it back (on=true)."
+      "description": "Takes a character on the live level off stage or brings it back."
     },
     {
       "name": "dos2_live_lua",
-      "description": "Runs Lua on the game server (Script Extender, in the bridge mod's context) and returns the value of return."
+      "description": "Runs arbitrary Lua on the game server through Script Extender, in the bridge mod's context, and returns the value of its return statement."
     }
   ],
   "compatibility": {

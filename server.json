@@ -3,7 +3,7 @@
   "name": "io.github.o-shabashov/dos2-gm-mcp",
   "title": "DOS2 Game Master",
   "description": "Divinity: Original Sin 2 Game Master mode: edit campaign files, drive the live game via a bridge mod",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "repository": {
     "url": "https://github.com/o-shabashov/dos2-gm-mcp",
     "source": "github"
@@ -11,8 +11,8 @@
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/o-shabashov/dos2-gm-mcp/releases/download/v0.1.0/dos2-gm-mcp.mcpb",
-      "fileSha256": "11af30600cc0f164cca09ea7979cd47fcc814c275a16beca78081f99a4dd8936",
+      "identifier": "https://github.com/o-shabashov/dos2-gm-mcp/releases/download/v0.1.1/dos2-gm-mcp.mcpb",
+      "fileSha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "transport": {
         "type": "stdio"
       }
