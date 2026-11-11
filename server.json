@@ -12,7 +12,7 @@
     {
       "registryType": "mcpb",
       "identifier": "https://github.com/o-shabashov/dos2-gm-mcp/releases/download/v0.1.1/dos2-gm-mcp.mcpb",
-      "fileSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "fileSha256": "3747b398d0e97e728d343624165bd5984692576ebdd639068d1752f46a70a87e",
       "transport": {
         "type": "stdio"
       }
